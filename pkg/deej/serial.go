@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jacobsa/go-serial/serial"
+	"github.com/micmonay/keybd_event"
 	"go.uber.org/zap"
 
 	"github.com/omriharel/deej/pkg/deej/util"
@@ -42,6 +43,10 @@ type SliderMoveEvent struct {
 }
 
 var expectedLinePattern = regexp.MustCompile(`^\d{1,4}(\|\d{1,4})*\r\n$`)
+
+var deafenState = false
+var muteState = false
+var expectedLinePatternExt = regexp.MustCompile(`^([D][0,1]{1})([|])([M][0,1]{1})(\r|\n|\r\n)$`)
 
 // NewSerialIO creates a SerialIO instance that uses the provided deej
 // instance's connection info to establish communications with the arduino chip
@@ -228,9 +233,60 @@ func (sio *SerialIO) readLine(logger *zap.SugaredLogger, reader *bufio.Reader) c
 
 func (sio *SerialIO) handleLine(logger *zap.SugaredLogger, line string) {
 
+	if expectedLinePatternExt.MatchString(line) {
+		line = strings.TrimSuffix(line, "\r\n")
+		splitline := strings.Split(line, "|")
+		splitline[0] = strings.TrimPrefix(splitline[0], "D")
+		splitline[1] = strings.TrimPrefix(splitline[1], "M")
+
+		lineInt1, _ := strconv.Atoi(splitline[0][0:1])
+		lineInt2, _ := strconv.Atoi(splitline[1][0:1])
+		/*
+			if !deafenState && lineInt == 1 {
+				//Deafen
+				kb, _ := keybd_event.NewKeyBonding()
+				kb.SetKeys(keybd_event.VK_SP4)
+				//kb.HasSHIFT(true)
+
+				kb.Launching()
+				logger.Debugw("Deafen")
+				deafenState = true
+
+			}
+			if deafenState && lineInt == 0 {
+				//Undeafen
+				logger.Debug("Undeafen")
+				deafenState = false
+			}*/
+
+		if lineInt1 == 1 && !deafenState {
+			kb, _ := keybd_event.NewKeyBonding()
+			kb.SetKeys(keybd_event.VK_SP4)
+			kb.Launching()
+			logger.Debugw("Deafen Toggled")
+			deafenState = true
+
+		}
+		if lineInt1 == 0 && deafenState {
+			deafenState = false
+		}
+
+		if lineInt2 == 1 && !muteState {
+			kb, _ := keybd_event.NewKeyBonding()
+			kb.SetKeys(keybd_event.VK_SP5)
+			kb.Launching()
+			logger.Debugw("Mute Toggled")
+			muteState = true
+
+		}
+		if lineInt2 == 0 && muteState {
+			muteState = false
+		}
+
+	}
 	// this function receives an unsanitized line which is guaranteed to end with LF,
 	// but most lines will end with CRLF. it may also have garbage instead of
-	// deej-formatted values, so we must check for that! just ignore bad ones
+	// deej-formatited values, so we must check for that! just ignore bad ones
 	if !expectedLinePattern.MatchString(line) {
 		return
 	}
@@ -284,7 +340,7 @@ func (sio *SerialIO) handleLine(logger *zap.SugaredLogger, line string) {
 
 			// if it does, update the saved value and create a move event
 			sio.currentSliderPercentValues[sliderIdx] = normalizedScalar
-
+			//Here creates the event
 			moveEvents = append(moveEvents, SliderMoveEvent{
 				SliderID:     sliderIdx,
 				PercentValue: normalizedScalar,
