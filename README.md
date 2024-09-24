@@ -1,4 +1,4 @@
-#What is this fork?
+# What is this fork?
 
 this fork is a work in progress that aims to create a Button Macro System for the Deej device and use those as simple keypresses for applications to catch (example Deafen and Mute on discord)
 The macro is working, the functionality is there, Just needs to iron out the process of binding macro buttons into the code
